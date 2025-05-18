@@ -29,7 +29,7 @@ from retrieve import extract_qa_pairs, save_to_txt, save_to_json, format_qa_pair
 
 # Import version information
 try:
-    from quizlet_converter_version import __version__
+    from version_converter import __version__
 except ImportError:
     __version__ = "0.0.0-dev"
 

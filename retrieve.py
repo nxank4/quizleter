@@ -66,7 +66,6 @@ def extract_qa_pairs(html_file, words_to_remove=None, chars_to_remove=None):
 
     current_question_text = None
     current_options = []
-    current_block = None
 
     for p in paragraphs:
         text = p.get_text().strip()
