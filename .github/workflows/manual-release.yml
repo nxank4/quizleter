@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g., 1.0.0)"
+        description: "Release version (e.g., 0.1.0)"
         required: true
         default: "0.1.0"
       app_name:
-        description: "Application name (defaults to Quizleter)"
-        required: false
-        default: "Quizleter"
+        description: "Application name (defaults to quizleter)"
+        required: true
+        default: "quizleter"
       prerelease:
-        description: "Is this a pre-release?"
+        description: "Pre-release?"
         required: true
         default: false
         type: boolean
