@@ -68,14 +68,14 @@ jobs:
           Compress-Archive -Path dist/* -DestinationPath $zipFile
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Quizleter-${{ steps.get_version.outputs.VERSION_NUM }}
           path: Quizleter-${{ steps.get_version.outputs.VERSION_NUM }}.zip
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.get_version.outputs.RELEASE_NAME }}
           draft: false
