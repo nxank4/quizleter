@@ -1,5 +1,7 @@
 # Quizleter
 
+![Quizleter Banner](assets/banner.png)
+
 Quizleter is a tool for converting Quizlet HTML exports into structured formats for better studying, flashcard creation, and content reuse.
 
 ## Overview
