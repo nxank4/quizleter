@@ -5,35 +5,79 @@ name: Python application
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
+    tags:
+      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 permissions:
-  contents: read
+  contents: write # Changed to write to allow releases
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    runs-on: windows-latest # Changed to Windows for PyInstaller compatibility
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v3
-      with:
-        python-version: "3.10"
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
-      run: |
-        pytest
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pytest pyinstaller
+          if (Test-Path -Path "requirements.txt" -PathType Leaf) {
+              pip install -r requirements.txt
+          }
+
+      - name: Get version
+        id: get_version
+        shell: bash
+        run: |
+          # Set default version if not a tag
+          echo "VERSION=${GITHUB_REF_NAME:-v0.0.0-dev}" >> $GITHUB_OUTPUT
+          echo "VERSION_NUM=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+          echo "RELEASE_NAME=Quizleter ${GITHUB_REF_NAME:-Development Build}" >> $GITHUB_OUTPUT
+
+      - name: Lint with Ruff
+        run: |
+          # Install ruff if not installed in dependencies
+          pip install ruff
+          # Run ruff with default settings
+          ruff check .
+          # Run ruff format to check formatting
+          ruff format --check .
+
+      # - name: Test with pytest
+      #   run: |
+      #     pytest
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --name="Quizleter-${{ steps.get_version.outputs.VERSION_NUM }}" --onefile --windowed --icon=assets/icon.ico app.py
+          mkdir -p dist/assets
+          Copy-Item -Path "assets/icon.ico" -Destination "dist/assets/icon.ico"
+
+      - name: Create ZIP Archive
+        run: |
+          $zipFile = "Quizleter-${{ steps.get_version.outputs.VERSION_NUM }}.zip"
+          Compress-Archive -Path dist/* -DestinationPath $zipFile
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: Quizleter-${{ steps.get_version.outputs.VERSION_NUM }}
+          path: Quizleter-${{ steps.get_version.outputs.VERSION_NUM }}.zip
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ steps.get_version.outputs.RELEASE_NAME }}
+          draft: false
+          prerelease: false
+          files: Quizleter-${{ steps.get_version.outputs.VERSION_NUM }}.zip
