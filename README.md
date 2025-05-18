@@ -109,7 +109,7 @@ Converting a Quizlet export with multiple-choice questions:
 **Original Quizlet HTML content**:
 
 ```text
-NHUNG HOÀNG What is the capital of France?
+What is the capital of France?
 A. London
 B. Berlin
 C. Paris
