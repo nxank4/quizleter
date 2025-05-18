@@ -16,6 +16,10 @@ on:
         required: true
         default: false
         type: boolean
+      changelog:
+        description: "Changelog / What's new in this release"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -60,9 +64,19 @@ jobs:
           tag_name: "v${{ github.event.inputs.version }}"
           name: "Release ${{ github.event.inputs.version }}"
           body: |
-            - Version: ${{ github.event.inputs.version }}
-            - App Name: ${{ github.event.inputs.app_name }}
-            - Pre-release: ${{ github.event.inputs.prerelease }}
+
+            Quizlet Converter is a tool to convert Quizlet HTML files to structured text or JSON files for flashcard studies.
+            See the README for usage instructions and details.
+
+            ---
+
+            ${{ github.event.inputs.changelog }}
+
+            ---
+            **Version:** ${{ github.event.inputs.version }}
+            **App Name:** ${{ github.event.inputs.app_name }}
+            **Pre-release:** ${{ github.event.inputs.prerelease }}
+
           files: |
             ./dist/*
         env:
