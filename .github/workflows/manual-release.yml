@@ -44,15 +44,14 @@ jobs:
         shell: pwsh
         run: |
           $version_content = @"
-
           __version__ = "${{ github.event.inputs.version }}"
           __app_name__ = "${{ github.event.inputs.app_name }}"
           "@
                     Set-Content -Path quizlet_converter_version.py -Value $version_content
 
-                - name: Build executable
-                  run: |
-                    pyinstaller --onefile --name "${{ github.event.inputs.app_name }}" --distpath ./dist --workpath ./build --specpath ./spec "${{ github.workspace }}\src\main.py"
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --name "${{ github.event.inputs.app_name }}" --distpath ./dist --workpath ./build --icon=assets/icon.ico app.py
 
       - name: Create release
         id: create_release
