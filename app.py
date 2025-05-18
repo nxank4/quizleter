@@ -598,8 +598,10 @@ class QuizletConverterApp(QMainWindow):
                         QTimer.singleShot(
                             0, lambda: self.show_save_success(output_file)
                         )
-                    except Exception as ex:
-                        QTimer.singleShot(0, lambda: self.show_save_error(str(ex)))
+                    except Exception:
+                        QTimer.singleShot(
+                            0, lambda: self.show_save_error(str(Exception))
+                        )
 
                 save_thread = threading.Thread(target=save_and_notify_task, daemon=True)
                 save_thread.start()
