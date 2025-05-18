@@ -41,5 +41,44 @@ jobs:
           }
 
       - name: Update version file
+        shell: pwsh
         run: |
           $version_content = @"
+
+          __version__ = "${{ github.event.inputs.version }}"
+          __app_name__ = "${{ github.event.inputs.app_name }}"
+          "@
+                    Set-Content -Path quizlet_converter_version.py -Value $version_content
+
+                - name: Build executable
+                  run: |
+                    pyinstaller --onefile --name "${{ github.event.inputs.app_name }}" --distpath ./dist --workpath ./build --specpath ./spec "${{ github.workspace }}\src\main.py"
+
+      - name: Create release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v${{ github.event.inputs.version }}"
+          name: "Release ${{ github.event.inputs.version }}"
+          body: |
+            - Version: ${{ github.event.inputs.version }}
+            - App Name: ${{ github.event.inputs.app_name }}
+            - Pre-release: ${{ github.event.inputs.prerelease }}
+          files: |
+            ./dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-assets
+          path: ./dist/*
+
+      - name: Notify success
+        if: success()
+        run: echo "Release ${{ github.event.inputs.version }} built and uploaded successfully."
+
+      - name: Notify failure
+        if: failure()
+        run: echo "Release ${{ github.event.inputs.version }} failed."
