@@ -1,6 +1,7 @@
 # Quizleter
 
 ![Quizleter Banner](assets/banner.png)
+[![CI/CD](https://github.com/lunovian/quizleter/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/lunovian/quizleter/actions/workflows/ci-cd.yml)
 [![Release Builder](https://github.com/lunovian/quizleter/actions/workflows/manual-release.yml/badge.svg)](https://github.com/lunovian/quizleter/actions/workflows/manual-release.yml)
 
 Quizleter is a tool for converting Quizlet HTML exports into structured formats for better studying, flashcard creation, and content reuse.
