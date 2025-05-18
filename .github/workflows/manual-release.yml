@@ -1,4 +1,4 @@
-name: Manual Release Builder
+name: Release Builder
 
 on:
   workflow_dispatch:
