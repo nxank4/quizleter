@@ -51,11 +51,11 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --name "${{ github.event.inputs.app_name }}" --distpath ./dist --workpath ./build --icon=assets/icon.ico app.py
+          pyinstaller --onefile --windowed --name "${{ github.event.inputs.app_name }}" --distpath ./dist --workpath ./build --icon=assets/icon.ico --add-data "assets;assets" app.py
 
       - name: Create release
         id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ github.event.inputs.version }}"
           name: "Release ${{ github.event.inputs.version }}"

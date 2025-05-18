@@ -1,11 +1,21 @@
 from bs4 import BeautifulSoup
 import json
 import re
+from typing import List, Optional, Dict
+
+# Regex patterns as constants
+ANSWER_MARKER_PATTERN = re.compile(r";;([A-E])\s*$")
+OPTION_PATTERN = re.compile(r"^[A-E][.)]?\s")
+CLEAN_OPTION_PATTERN = re.compile(r"^[A-E][.)]?\s*")
 
 
-def clean_text(text, words_to_remove=None, chars_to_remove=None):
+def clean_text(
+    text: str,
+    words_to_remove: Optional[List[str]] = None,
+    chars_to_remove: Optional[str] = None,
+) -> str:
     """
-    Clean text by removing specified words and characters
+    Clean text by removing specified words and characters.
 
     Args:
         text (str): The input text to clean
@@ -39,7 +49,46 @@ def clean_text(text, words_to_remove=None, chars_to_remove=None):
     return text
 
 
-def extract_qa_pairs(html_file, words_to_remove=None, chars_to_remove=None):
+def extract_answer_letters(soup: BeautifulSoup) -> List[str]:
+    """
+    Extract answer letters from Quizlet HTML (span.TermText notranslate lang-vi).
+    Returns a list of answer letters (A-E) in order.
+    """
+    return [
+        span.get_text(strip=True)
+        for span in soup.find_all("span", class_="TermText notranslate lang-vi")
+        if re.fullmatch(r"[A-E]", span.get_text(strip=True))
+    ]
+
+
+def fallback_detect_answer(question_block: Dict, soup: BeautifulSoup) -> Optional[str]:
+    """
+    Try to detect the correct answer from HTML if not provided.
+    """
+    # Method 1: Look for highlighted or marked correct answers
+    correct_spans = soup.select("span.TermText.correct, span.TermText.is-correct")
+    for span in correct_spans:
+        match = re.search(r"\b([A-E])[.)]", span.get_text())
+        if match:
+            return match.group(1)
+    # Method 2: Look for specific answer classes or attributes
+    correct_elements = soup.select("div.correct-answer, span.is-correct")
+    for element in correct_elements:
+        text = element.get_text().strip()
+        match = re.search(r"\b([A-E])[.)]", text)
+        if match:
+            return match.group(1)
+    # Fallback: use first option if available
+    if question_block["options"]:
+        return question_block["options"][0]["letter"]
+    return None
+
+
+def extract_qa_pairs(
+    html_file: str,
+    words_to_remove: Optional[List[str]] = None,
+    chars_to_remove: Optional[str] = None,
+) -> List[Dict]:
     """
     Extract multiple choice questions and answers from HTML file
 
@@ -53,113 +102,91 @@ def extract_qa_pairs(html_file, words_to_remove=None, chars_to_remove=None):
     """
     with open(html_file, "r", encoding="utf-8") as f:
         html_content = f.read()
-
     soup = BeautifulSoup(html_content, "html.parser")
 
-    # Default words to remove if none specified
     if words_to_remove is None:
         words_to_remove = ["NHUNG HOÀNG"]
 
-    # Find all question blocks
-    question_blocks = []
-    paragraphs = soup.find_all("p")
+    # Extract answer letters in order
+    answer_letters = extract_answer_letters(soup)
 
+    # Parse questions and options
+    question_blocks = []
+    paragraphs = (p.get_text().strip() for p in soup.find_all("p"))
     current_question_text = None
     current_options = []
+    current_answer = None
 
-    for p in paragraphs:
-        text = p.get_text().strip()
-
-        # Skip empty paragraphs
+    for text in paragraphs:
         if not text:
             continue
 
-        # Clean the text
-        cleaned_text = clean_text(text, words_to_remove, chars_to_remove)
+        # Detect answer marker (e.g., ;;A at the end)
+        answer_marker = None
+        answer_match = ANSWER_MARKER_PATTERN.search(text)
+        if answer_match:
+            answer_marker = answer_match.group(1)
+            text = ANSWER_MARKER_PATTERN.sub("", text)
 
-        # Skip if text is empty after cleaning
+        cleaned_text = clean_text(text, words_to_remove, chars_to_remove)
         if not cleaned_text:
             continue
 
-        # Check if this is a new question
         if "NHUNG HOÀNG" in text:
-            # Save previous question block if it exists
             if current_question_text and current_options:
                 question_blocks.append(
-                    {"question_text": current_question_text, "options": current_options}
+                    {
+                        "question_text": current_question_text,
+                        "options": current_options,
+                        "answer": current_answer,
+                    }
                 )
-
-            # Start new question
             current_question_text = cleaned_text
             current_options = []
-
-        # Check if this is an option (A, B, C, D, E)
-        elif re.match(r"^[A-E]\.\s", text) or re.match(r"^[A-E]\)\s", text):
-            # Extract the option letter
+            current_answer = answer_marker
+        elif OPTION_PATTERN.match(text):
             option_letter = text[0]
-
-            # Remove the letter prefix from the option text
-            # This fixes the "A. A. Option" redundancy
-            option_text = re.sub(r"^[A-E]\.?\s*", "", cleaned_text)
-
+            option_text = CLEAN_OPTION_PATTERN.sub("", cleaned_text)
             current_options.append({"letter": option_letter, "text": option_text})
+            if answer_marker:
+                current_answer = answer_marker
 
-    # Add the last question block if it exists
     if current_question_text and current_options:
         question_blocks.append(
-            {"question_text": current_question_text, "options": current_options}
+            {
+                "question_text": current_question_text,
+                "options": current_options,
+                "answer": current_answer,
+            }
         )
 
-    # Try to find the correct answers
+    # Assign extracted answer letters to questions in order
+    for idx, qb in enumerate(question_blocks):
+        if idx < len(answer_letters):
+            qb["answer"] = answer_letters[idx]
+
+    # Build qa_pairs
     qa_pairs = []
-
-    # Look for correct answer indicators in the HTML
-    for i, question_block in enumerate(question_blocks):
-        correct_answer = None
-
-        # Method 1: Look for highlighted or marked correct answers
-        # This is a simplified approach - you'll need to adapt based on actual Quizlet HTML structure
-        correct_spans = soup.select("span.TermText.correct, span.TermText.is-correct")
-
-        for span in correct_spans:
-            # Look for A, B, C, D in the text
-            match = re.search(r"\b([A-E])[.)]", span.get_text())
-            if match:
-                correct_answer = match.group(1)
-                break
-
-        # Method 2: Look for specific answer classes or attributes
-        # If marked in a different way in Quizlet HTML
-        if not correct_answer:
-            # Example: find elements with correct answer class
-            correct_elements = soup.select("div.correct-answer, span.is-correct")
-
-            for element in correct_elements:
-                text = element.get_text().strip()
-                match = re.search(r"\b([A-E])[.)]", text)
-                if match:
-                    correct_answer = match.group(1)
-                    break
-
-        # If still no correct answer found, try to infer from HTML structure or class names
-        if not correct_answer and question_block["options"]:
-            # For now, just use the first option as a fallback
-            # You should replace this with actual logic based on Quizlet's specific HTML
-            correct_answer = question_block["options"][0]["letter"]
-
-        # Create the QA pair
-        qa_pair = {
-            "question": question_block["question_text"],
-            "options": [opt["text"] for opt in question_block["options"]],
-            "answer": correct_answer,
-        }
-
-        qa_pairs.append(qa_pair)
+    for question_block in question_blocks:
+        answer = question_block.get("answer") or fallback_detect_answer(
+            question_block, soup
+        )
+        qa_pairs.append(
+            {
+                "question": question_block["question_text"],
+                "options": [opt["text"] for opt in question_block["options"]],
+                "answer": answer,
+            }
+        )
 
     return qa_pairs
 
 
-def format_qa_pairs(qa_pairs, qa_separator="\t", card_separator="\n"):
+def format_qa_pairs(
+    qa_pairs: List[Dict],
+    qa_separator: str = ";;",
+    card_separator: str = "\n\n",
+) -> str:
     """
     Format question-answer pairs with custom separators
     qa_separator: separator between question and answers (default: tab)
@@ -189,7 +216,10 @@ def format_qa_pairs(qa_pairs, qa_separator="\t", card_separator="\n"):
 
 
 def save_to_txt(
-    qa_pairs, output_file="flashcards.txt", qa_separator="\t", card_separator="\n\n"
+    qa_pairs: List[Dict],
+    output_file: str = "flashcards.txt",
+    qa_separator: str = ";;",
+    card_separator: str = "\n\n",
 ):
     """
     Save the question-answer pairs to a text file with custom formatting
@@ -199,7 +229,7 @@ def save_to_txt(
         f.write(formatted_content)
 
 
-def save_to_json(qa_pairs, output_file="flashcards.json"):
+def save_to_json(qa_pairs: List[Dict], output_file: str = "flashcards.json"):
     """
     Save the question-answer pairs to a JSON file
     """
