@@ -1,3 +1,4 @@
 beautifulsoup4>=4.9.0
 PyQt6>=6.0.0
 pytest>=7.0.0
+pypdf

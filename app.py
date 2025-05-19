@@ -3,7 +3,6 @@ import os
 import sys
 import threading
 import concurrent.futures
-from functools import partial
 from typing import List
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
@@ -27,7 +26,12 @@ from PyQt6.QtWidgets import (
     QStatusBar,
 )
 
-from retrieve import extract_qa_pairs, save_to_txt, save_to_json, format_qa_pairs
+from src.retrieve_pdf import (
+    extract_qa_pairs_from_pdf as extract_qa_pairs,
+    save_to_txt,
+    save_to_json,
+    format_qa_pairs,
+)
 
 try:
     from version_converter import __version__
@@ -89,7 +93,6 @@ class PreviewWorker(QThread):
 
     def run(self):
         try:
-            # Progress: 0%
             self.progress.emit(0)
 
             # Extract data using executor to better handle CPU-bound tasks
@@ -100,15 +103,12 @@ class PreviewWorker(QThread):
                 chars_to_remove=self.chars_to_remove,
             )
 
-            # Show intermediate progress (this is a bit artificial but helps UX)
+            # Show intermediate progress
             for i in range(1, 5):
-                QThread.msleep(100)  # Sleep for 100ms
-                self.progress.emit(i * 10)  # Update progress from 10% to 40%
+                QThread.msleep(100)
+                self.progress.emit(i * 10)
 
-            # Wait for the result
             qa_pairs = future.result()
-
-            # Progress: 50%
             self.progress.emit(50)
 
             if not qa_pairs:
@@ -125,24 +125,17 @@ class PreviewWorker(QThread):
                     format_qa_pairs, qa_pairs, self.qa_sep, self.card_sep
                 )
 
-            # Show intermediate progress
             for i in range(6, 9):
-                QThread.msleep(100)  # Sleep for 100ms
-                self.progress.emit(i * 10)  # Update progress from 60% to 80%
+                QThread.msleep(100)
+                self.progress.emit(i * 10)
 
-            # Get the formatted content
             preview_content = format_future.result()
-
-            # Progress: 100%
             self.progress.emit(100)
-
-            # Send result
             self.finished.emit(qa_pairs, preview_content)
 
         except Exception as e:
             self.error.emit(str(e))
         finally:
-            # Always shut down the executor
             self.executor.shutdown(wait=False)
 
 
@@ -192,7 +185,7 @@ class QuizletConverterApp(QMainWindow):
     def create_menus(self):
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("&File")
-        open_action = QAction("📂 Open HTML File", self)
+        open_action = QAction("📂 Open PDF File", self)
         open_action.setShortcut("Ctrl+O")
         open_action.triggered.connect(self.browse_file)
         file_menu.addAction(open_action)
@@ -226,19 +219,19 @@ class QuizletConverterApp(QMainWindow):
         help_menu.addAction(about_action)
 
     def create_input_section(self):
-        input_label = QLabel("1. Select Quizlet HTML File")
+        input_label = QLabel("1. Select PDF File")
         input_label.setFont(QFont("Arial", 13, QFont.Weight.Bold))
         self.main_layout.addWidget(input_label)
         input_layout = QHBoxLayout()
         self.file_path_input = QLineEdit()
         self.file_path_input.setPlaceholderText(
-            "Drag & drop or browse for a Quizlet HTML file..."
+            "Drag & drop or browse for a PDF file..."
         )
         self.file_path_input.setClearButtonEnabled(True)
         self.file_path_input.textChanged.connect(self.on_input_change)
         input_layout.addWidget(self.file_path_input)
         browse_button = QPushButton("Browse")
-        browse_button.setToolTip("Browse for a Quizlet HTML file")
+        browse_button.setToolTip("Browse for a PDF file")
         browse_button.clicked.connect(self.browse_file)
         browse_button.setFixedWidth(90)
         input_layout.addWidget(browse_button)
@@ -261,22 +254,52 @@ class QuizletConverterApp(QMainWindow):
 
     def create_separator_section(self):
         self.separator_group = QGroupBox("3. Separator Options (for TXT)")
-        separator_layout = QHBoxLayout(self.separator_group)
+        separator_layout = QVBoxLayout(self.separator_group)
+
+        # Q/A Separator section
+        qa_layout = QHBoxLayout()
         qa_sep_label = QLabel("Q/A Separator:")
-        separator_layout.addWidget(qa_sep_label)
+        qa_layout.addWidget(qa_sep_label)
         self.qa_separator_combo = QComboBox()
-        self.qa_separator_combo.addItems(["\\t (Tab)", ",", "|", ";;", "=>", " - "])
+        self.qa_separator_combo.addItems(
+            ["\\t (Tab)", ",", "|", ";;", "=>", " - ", "Other"]
+        )
         self.qa_separator_combo.setCurrentIndex(0)
-        separator_layout.addWidget(self.qa_separator_combo)
+        self.qa_separator_combo.currentTextChanged.connect(self.on_separator_changed)
+        qa_layout.addWidget(self.qa_separator_combo)
+        self.qa_custom_input = QLineEdit()
+        self.qa_custom_input.setPlaceholderText("Enter custom separator")
+        self.qa_custom_input.setVisible(False)
+        qa_layout.addWidget(self.qa_custom_input)
+        qa_layout.addStretch()
+        separator_layout.addLayout(qa_layout)
+
+        # Card Separator section
+        card_layout = QHBoxLayout()
         card_sep_label = QLabel("Card Separator:")
-        separator_layout.addWidget(card_sep_label)
+        card_layout.addWidget(card_sep_label)
         self.card_separator_combo = QComboBox()
         self.card_separator_combo.addItems(
-            ["\\n (Newline)", "\\n\\n (2 Newlines)", ";", "===", "---", "*****"]
+            [
+                "\\n (Newline)",
+                "\\n\\n (2 Newlines)",
+                ";",
+                "===",
+                "---",
+                "*****",
+                "Other",
+            ]
         )
         self.card_separator_combo.setCurrentIndex(1)
-        separator_layout.addWidget(self.card_separator_combo)
-        separator_layout.addStretch()
+        self.card_separator_combo.currentTextChanged.connect(self.on_separator_changed)
+        card_layout.addWidget(self.card_separator_combo)
+        self.card_custom_input = QLineEdit()
+        self.card_custom_input.setPlaceholderText("Enter custom separator")
+        self.card_custom_input.setVisible(False)
+        card_layout.addWidget(self.card_custom_input)
+        card_layout.addStretch()
+        separator_layout.addLayout(card_layout)
+
         self.main_layout.addWidget(self.separator_group)
         self.main_layout.addSpacing(8)
 
@@ -426,7 +449,10 @@ class QuizletConverterApp(QMainWindow):
 
     def browse_file(self):
         filename, _ = QFileDialog.getOpenFileName(
-            self, "Select HTML File", "", "HTML files (*.html);;All files (*)"
+            self,
+            "Select File",
+            "",
+            "PDF files (*.pdf);;All files (*)",
         )
         if filename:
             self.file_path_input.setText(filename)
@@ -434,29 +460,45 @@ class QuizletConverterApp(QMainWindow):
     def on_input_change(self, text: str):
         if os.path.isfile(text):
             self.statusBar.showMessage(f"File loaded: {text}")
-            if text.lower().endswith((".html", ".htm")):
-                QTimer.singleShot(500, self.preview)
-            else:
-                self.statusBar.showMessage("Selected file is not an HTML file")
+            if not text.lower().endswith(".pdf"):
+                self.statusBar.showMessage("Selected file is not a PDF file")
         else:
-            self.statusBar.showMessage("Invalid file. Please select a valid HTML file.")
+            self.statusBar.showMessage("Invalid file. Please select a valid file.")
 
     def toggle_separator_options(self):
         self.separator_group.setVisible(self.format_txt_radio.isChecked())
-        if self.file_path_input.text():
-            QTimer.singleShot(500, self.preview)
+
+    def on_separator_changed(self, text: str):
+        if text == "Other":
+            if self.sender() == self.qa_separator_combo:
+                self.qa_custom_input.setVisible(True)
+            else:
+                self.card_custom_input.setVisible(True)
+        else:
+            if self.sender() == self.qa_separator_combo:
+                self.qa_custom_input.setVisible(False)
+            else:
+                self.card_custom_input.setVisible(False)
 
     def get_separators(self):
-        qa_sep = (
-            self.qa_separator_combo.currentText()
-            .replace("\\t", "\t")
-            .replace("\\n", "\n")
-        )
-        card_sep = (
-            self.card_separator_combo.currentText()
-            .replace("\\t", "\t")
-            .replace("\\n", "\n")
-        )
+        qa_sep = self.qa_separator_combo.currentText()
+        if qa_sep == "Other":
+            qa_sep = self.qa_custom_input.text()
+        elif qa_sep == "\\t (Tab)":
+            qa_sep = "\t"
+        else:
+            qa_sep = qa_sep.split(" ")[0]  # Take only the first part before space
+
+        card_sep = self.card_separator_combo.currentText()
+        if card_sep == "Other":
+            card_sep = self.card_custom_input.text()
+        elif card_sep == "\\n (Newline)":
+            card_sep = "\n"
+        elif card_sep == "\\n\\n (2 Newlines)":
+            card_sep = "\n\n"
+        else:
+            card_sep = card_sep.split(" ")[0]  # Take only the first part before space
+
         return qa_sep, card_sep
 
     def preview(self):
@@ -538,12 +580,14 @@ class QuizletConverterApp(QMainWindow):
                 self, "Warning", "Preview is empty. Please generate a preview first."
             )
             return
+
         words_to_remove = [
             word.strip()
             for word in self.words_to_remove_input.text().split(",")
             if word.strip()
         ]
         chars_to_remove = self.chars_to_remove_input.text()
+
         with concurrent.futures.ThreadPoolExecutor() as executor:
             self.statusBar.showMessage("Processing...")
             self.progress_bar.setVisible(True)
@@ -561,15 +605,18 @@ class QuizletConverterApp(QMainWindow):
                 )
             )
             self.save_timer.start(200)
+
             try:
                 qa_pairs = future.result()
                 self.save_timer.stop()
                 self.progress_bar.setValue(95)
+
                 if not qa_pairs:
                     QMessageBox.information(self, "Info", "No questions found")
                     self.progress_bar.setVisible(False)
                     self.statusBar.showMessage("No questions found, save cancelled.")
                     return
+
                 is_json = self.format_json_radio.isChecked()
                 default_ext = ".json" if is_json else ".txt"
                 output_file, _ = QFileDialog.getSaveFileName(
@@ -578,33 +625,33 @@ class QuizletConverterApp(QMainWindow):
                     "",
                     f"{'JSON' if is_json else 'Text'} Files (*{default_ext});;All Files (*)",
                 )
+
                 if not output_file:
                     self.progress_bar.setVisible(False)
                     self.statusBar.showMessage("Save cancelled by user.")
                     return
+
                 self.progress_bar.setValue(100)
                 qa_sep, card_sep = self.get_separators()
-                save_func = (
-                    save_to_json
-                    if is_json
-                    else partial(
-                        save_to_txt, qa_separator=qa_sep, card_separator=card_sep
-                    )
-                )
 
                 def save_and_notify_task():
                     try:
-                        save_func(qa_pairs, output_file)
+                        if is_json:
+                            save_to_json(qa_pairs, output_file)
+                        else:
+                            save_to_txt(qa_pairs, output_file, qa_sep, card_sep)
                         QTimer.singleShot(
                             0, lambda: self.show_save_success(output_file)
                         )
-                    except Exception:
+                    except Exception as e:
+                        error_message = str(e)
                         QTimer.singleShot(
-                            0, lambda: self.show_save_error(str(Exception))
+                            0, lambda: self.show_save_error(error_message)
                         )
 
                 save_thread = threading.Thread(target=save_and_notify_task, daemon=True)
                 save_thread.start()
+
             except Exception as e_extract:
                 self.save_timer.stop()
                 self.progress_bar.setVisible(False)
@@ -644,7 +691,7 @@ class QuizletConverterApp(QMainWindow):
         help_text = """
 Quizlet Converter Help
 
-1. Load HTML: Click 'Browse' or drag-drop an HTML file
+1. Load PDF: Click 'Browse' or drag-drop a PDF file
 2. Choose Format: Select TXT or JSON output format
 3. For TXT format, customize separators
 4. Click 'Preview' to see how the output will look
@@ -662,7 +709,7 @@ Keyboard Shortcuts:
         about_text = f"""
 Quizlet Converter
 
-A simple tool to convert Quizlet HTML files to 
+A simple tool to convert PDF files to 
 structured text or JSON files for flashcard studies.
 
 Version: {__version__}
