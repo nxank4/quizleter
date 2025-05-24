@@ -4,11 +4,11 @@
 [![CI/CD](https://github.com/lunovian/quizleter/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/lunovian/quizleter/actions/workflows/ci-cd.yml)
 [![Release Builder](https://github.com/lunovian/quizleter/actions/workflows/manual-release.yml/badge.svg)](https://github.com/lunovian/quizleter/actions/workflows/manual-release.yml)
 
-Quizleter is a tool for converting Quizlet HTML exports into structured formats for better studying, flashcard creation, and content reuse.
+Quizleter is a tool for converting PDF files containing multiple-choice questions into structured formats for better studying, flashcard creation, and content reuse.
 
 ## Overview
 
-Quizleter extracts multiple-choice questions and answers from Quizlet HTML files and converts them into more usable formats like text or JSON. This is particularly useful for students and educators who want to:
+Quizleter extracts multiple-choice questions and answers from PDF files and converts them into more usable formats like text or JSON. This is particularly useful for students and educators who want to:
 
 - Export their Quizlet study sets to other flashcard applications
 - Create printable study materials
@@ -17,7 +17,7 @@ Quizleter extracts multiple-choice questions and answers from Quizlet HTML files
 
 ## Features
 
-- **HTML Parsing**: Extract questions, options, and answers from Quizlet exports
+- **PDF Processing**: Extract multiple-choice questions, options, and answers from PDF files
 - **Text Cleaning**:
   - Remove specific words or phrases (like author names)
   - Strip unwanted characters from text
@@ -38,7 +38,7 @@ Quizleter extracts multiple-choice questions and answers from Quizlet HTML files
 
 ### Installation
 
-1. Download the latest release from the [Releases page](https://github.com/your-username/quizlet-tool/releases)
+1. Download the latest release from the [Releases page](https://github.com/lunovian/quizleter/releases)
 2. Extract the ZIP file
 3. Run the `Quizleter.exe` executable (Windows) or the equivalent for your platform
 
@@ -48,8 +48,8 @@ If you want to run from source:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/quizlet-tool.git
-cd quizlet-tool
+git clone https://github.com/lunovian/quizleter.git
+cd quizleter
 
 # Install dependencies
 pip install -r requirements.txt
@@ -61,8 +61,8 @@ python app.py
 ## How to Use
 
 1. **Launch the application**: Open Quizleter
-2. **Load the HTML file**:
-   - Click "Browse" to select your Quizlet HTML export file, or
+2. **Load the PDF file**:
+   - Click "Browse" to select your PDF file containing multiple-choice questions, or
    - Drag and drop the file onto the application
 3. **Choose output format**:
    - Select "Text File (.txt)" or "JSON File (.json)"
@@ -108,7 +108,7 @@ Releases follow semantic versioning (X.Y.Z):
 
 Converting a Quizlet export with multiple-choice questions:
 
-**Original Quizlet HTML content**:
+**Original PDF content**:
 
 ```text
 What is the capital of France?
