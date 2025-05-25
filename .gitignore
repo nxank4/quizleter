@@ -2,3 +2,4 @@
 *.pdf
 flashcards.txt
 *.json
+config.py
